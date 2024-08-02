@@ -22,7 +22,7 @@ wl_water, k_water = get_refractive_index(
     )
 
 # window across which to fit the liquid water aborption feature
-l_shoulder = 400
+l_shoulder = 300
 r_shoulder = 2500
 
 
@@ -44,7 +44,7 @@ class MultiComponentSurface_Water(MultiComponentSurface):
         self.n_state = len(self.statevec_names)
 
 
-
+    # unchanged from surface_multicomp
     def component(self, x, geom):
         """We pick a surface model component using the Mahalanobis distance.
 
@@ -89,7 +89,64 @@ class MultiComponentSurface_Water(MultiComponentSurface):
             geom.surf_cmp_init = closest
         return closest
     
+    # unchanged from surface_multicomp
+    def xa(self, x_surface, geom):
+        """Mean of prior distribution, calculated at state x. We find
+        the covariance in a normalized space (normalizing by z) and then un-
+        normalize the result for the calling function. This always uses the
+        Lambertian (non-specular) version of the surface reflectance."""
+
+        lamb = self.calc_lamb(x_surface, geom)
+        lamb_ref = lamb[self.idx_ref]
+        mu = np.zeros(self.n_state)
+        ci = self.component(x_surface, geom)
+        lamb_mu = self.components[ci][0]
+        lamb_mu = lamb_mu * self.norm(lamb_ref)
+        mu[self.idx_lamb] = lamb_mu
+        return mu
+
+
+    # unchanged from surface_multicomp
+    def Sa(self, x_surface, geom):
+        """Covariance of prior distribution, calculated at state x. We find
+        the covariance in a normalized space (normalizing by z) and then un-
+        normalize the result for the calling function."""
+
+        lamb = self.calc_lamb(x_surface, geom)
+        lamb_ref = lamb[self.idx_ref]
+        ci = self.component(x_surface, geom)
+        Cov = self.components[ci][1]
+        Cov = Cov * (self.norm(lamb_ref) ** 2)
+
+        # If there are no other state vector elements, we're done.
+        if len(self.statevec_names) == len(self.idx_lamb):
+            return Cov
+
+        # Embed into a larger state vector covariance matrix
+        nprefix = self.idx_lamb[0]
+        nsuffix = len(self.statevec_names) - self.idx_lamb[-1] - 1
+        Cov_prefix = np.zeros((nprefix, nprefix))
+        Cov_suffix = np.zeros((nsuffix, nsuffix))
+        return block_diag(Cov_prefix, Cov, Cov_suffix)
     
+    # unchanged from surface_multicomp
+    def fit_params(self, rfl_meas, geom, *args):
+        """Given a reflectance estimate, fit a state vector."""
+
+        x_surface = np.zeros(len(self.statevec_names))
+        if len(rfl_meas) != len(self.idx_lamb):
+            raise ValueError("Mismatched reflectances")
+        for i, r in zip(self.idx_lamb, rfl_meas):
+            x_surface[i] = max(
+                self.bounds[i][0] + 0.001, min(self.bounds[i][1] - 0.001, r)
+            )
+        return x_surface
+
+    # unchanged from surface_multicomp
+    def calc_rfl(self, x_surface, geom):
+        """Non-Lambertian reflectance."""
+
+        return self.calc_lamb(x_surface, geom)
 
     # modified from surface_multicomp
     def calc_lamb(self, x_surface, geom):
@@ -131,7 +188,7 @@ class MultiComponentSurface_Water(MultiComponentSurface):
     def calc_attenuation(self, ewt):
         """Calculate attenuation due to water at each wavelength"""
         abs_co = self.calc_abs(ewt)
-        attenuation = 1 - np.exp(-ewt * 1e7 * abs_co)
+        attenuation = np.exp(-ewt * 1e7 * abs_co)
 
         return attenuation
     
