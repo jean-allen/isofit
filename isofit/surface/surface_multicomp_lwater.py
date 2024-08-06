@@ -35,6 +35,8 @@ class MultiComponentSurface_Water(MultiComponentSurface):
         self.ewt_initial = 0.0
         self.ewt_bounds = [-0.5, 0.5]            # @jean -- should account for the fact that EWT could be negative depending on priors?
 
+        self.idx_ewt = self.idx_lamb[-1] + 1
+
         rmin, rmax = 0, 2.0
         self.statevec_names = ["RFL_%04i" % int(w) for w in self.wl] + ["Water_Thickness"]
         self.bounds = [[rmin, rmax] for w in self.wl] + [self.ewt_bounds]
@@ -154,7 +156,7 @@ class MultiComponentSurface_Water(MultiComponentSurface):
 
         # Partition state vector into reflectance and water thickness
         rfl = x_surface[self.idx_lamb]
-        ewt = x_surface[-1]
+        ewt = x_surface[self.idx_ewt]
 
         # Calculate attenuation due to water
         attenuation = self.calc_attenuation(ewt)
@@ -164,7 +166,7 @@ class MultiComponentSurface_Water(MultiComponentSurface):
     # brand new!
     def calc_abs_vector(self, x_surface):
         """Calculate absorption coefficient of water at each wavelength"""
-        ewt = x_surface[-1]
+        ewt = x_surface[self.idx_ewt]
 
         return self.calc_abs(ewt)
     
@@ -192,14 +194,32 @@ class MultiComponentSurface_Water(MultiComponentSurface):
 
         return attenuation
     
-    # unchanged from surface_multicomp
+    # modified from surface_multicomp
     def dlamb_dsurface(self, x_surface, geom):
         """Partial derivative of Lambertian reflectance with respect to
         state vector, calculated at x_surface."""
 
-        dlamb = np.eye(self.n_wl, dtype=float)
+        # Partition state vector into reflectance and water thickness
+        rfl = x_surface[self.idx_lamb]
+        ewt = x_surface[self.idx_ewt]
+
+        # Calculate absorption coefficient of water at each wavelength
+        alpha = self.calc_abs(ewt)
+        atten = np.exp(-ewt * 1e7 * alpha)
+
+        # Build matrix of partial derivatives
+        # Takes format of identity matrix with attenuation coefficient in the place of the diagonal
+        dlamb = np.diag(atten)
+
+        # partial derivative of measured radiance in x_surface with respect to water thickness
+        datten_dewt = -1e7 * alpha * rfl * np.exp(-ewt * 1e7 * alpha)
+
+        # Concatenate the partial derivative of attenuation with respect to water thickness
+        # onto the end of the matrix
+        dlamb = np.hstack((dlamb, datten_dewt[:, np.newaxis]))
+
         nprefix = self.idx_lamb[0]
-        nsuffix = self.n_state - self.idx_lamb[-1] - 1
+        nsuffix = self.n_state - self.idx_lamb[-1] - 2   # changed to 2 to account for the water thickness
         prefix = np.zeros((self.n_wl, nprefix))
         suffix = np.zeros((self.n_wl, nsuffix))
         return np.concatenate((prefix, dlamb, suffix), axis=1)
