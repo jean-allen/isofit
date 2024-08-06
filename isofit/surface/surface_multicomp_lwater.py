@@ -34,6 +34,7 @@ class MultiComponentSurface_Water(MultiComponentSurface):
 
         self.ewt_initial = 0.0
         self.ewt_bounds = [-0.5, 0.5]            # @jean -- should account for the fact that EWT could be negative depending on priors?
+        self.ewt_sigma = 0.1
 
         self.idx_ewt = self.idx_lamb[-1] + 1
 
@@ -46,109 +47,8 @@ class MultiComponentSurface_Water(MultiComponentSurface):
         self.n_state = len(self.statevec_names)
 
 
-    # unchanged from surface_multicomp
-    def component(self, x, geom):
-        """We pick a surface model component using the Mahalanobis distance.
-
-        This always uses the Lambertian (non-specular) version of the
-        surface reflectance. If the forward model initialize via heuristic
-        (i.e. algebraic inversion), the component is only calculated once
-        based on that first solution. That state is preserved in the
-        geometry object.
-        """
-
-        if self.n_comp <= 1:
-            return 0
-        elif hasattr(geom, "surf_cmp_init"):
-            return geom.surf_cmp_init
-        elif self.select_on_init and hasattr(geom, "x_surf_init"):
-            x_surface = geom.x_surf_init
-        else:
-            x_surface = x
-
-        # Get the (possibly normalized) reflectance
-        lamb = self.calc_lamb(x_surface, geom)
-        lamb_ref = lamb[self.idx_ref]
-        lamb_ref = lamb_ref / self.norm(lamb_ref)
-
-        # Mahalanobis or Euclidean distances
-        mds = []
-        for ci in range(self.n_comp):
-            ref_mu = self.mus[ci]
-            ref_Cinv = self.Cinvs[ci]
-            if self.selection_metric == "Mahalanobis":
-                md = (lamb_ref - ref_mu).T.dot(ref_Cinv).dot(lamb_ref - ref_mu)
-            else:
-                md = sum(pow(lamb_ref - ref_mu, 2))
-            mds.append(md)
-        closest = np.argmin(mds)
-
-        if (
-            self.select_on_init
-            and hasattr(geom, "x_surf_init")
-            and (not hasattr(geom, "surf_cmp_init"))
-        ):
-            geom.surf_cmp_init = closest
-        return closest
     
-    # unchanged from surface_multicomp
-    def xa(self, x_surface, geom):
-        """Mean of prior distribution, calculated at state x. We find
-        the covariance in a normalized space (normalizing by z) and then un-
-        normalize the result for the calling function. This always uses the
-        Lambertian (non-specular) version of the surface reflectance."""
 
-        lamb = self.calc_lamb(x_surface, geom)
-        lamb_ref = lamb[self.idx_ref]
-        mu = np.zeros(self.n_state)
-        ci = self.component(x_surface, geom)
-        lamb_mu = self.components[ci][0]
-        lamb_mu = lamb_mu * self.norm(lamb_ref)
-        mu[self.idx_lamb] = lamb_mu
-        return mu
-
-
-    # unchanged from surface_multicomp
-    def Sa(self, x_surface, geom):
-        """Covariance of prior distribution, calculated at state x. We find
-        the covariance in a normalized space (normalizing by z) and then un-
-        normalize the result for the calling function."""
-
-        lamb = self.calc_lamb(x_surface, geom)
-        lamb_ref = lamb[self.idx_ref]
-        ci = self.component(x_surface, geom)
-        Cov = self.components[ci][1]
-        Cov = Cov * (self.norm(lamb_ref) ** 2)
-
-        # If there are no other state vector elements, we're done.
-        if len(self.statevec_names) == len(self.idx_lamb):
-            return Cov
-
-        # Embed into a larger state vector covariance matrix
-        nprefix = self.idx_lamb[0]
-        nsuffix = len(self.statevec_names) - self.idx_lamb[-1] - 1
-        Cov_prefix = np.zeros((nprefix, nprefix))
-        Cov_suffix = np.zeros((nsuffix, nsuffix))
-        return block_diag(Cov_prefix, Cov, Cov_suffix)
-    
-    # unchanged from surface_multicomp
-    def fit_params(self, rfl_meas, geom, *args):
-        """Given a reflectance estimate, fit a state vector."""
-
-        x_surface = np.zeros(len(self.statevec_names))
-        if len(rfl_meas) != len(self.idx_lamb):
-            raise ValueError("Mismatched reflectances")
-        for i, r in zip(self.idx_lamb, rfl_meas):
-            x_surface[i] = max(
-                self.bounds[i][0] + 0.001, min(self.bounds[i][1] - 0.001, r)
-            )
-        return x_surface
-
-    # unchanged from surface_multicomp
-    def calc_rfl(self, x_surface, geom):
-        """Non-Lambertian reflectance."""
-
-        return self.calc_lamb(x_surface, geom)
 
     # modified from surface_multicomp
     def calc_lamb(self, x_surface, geom):
@@ -161,7 +61,32 @@ class MultiComponentSurface_Water(MultiComponentSurface):
         # Calculate attenuation due to water
         attenuation = self.calc_attenuation(ewt)
 
-        return rfl * attenuation
+        return rfl
+    
+    def Sa(self, x_surface, geom):
+        """Covariance of prior distribution, calculated at state x. We find
+        the covariance in a normalized space (normalizing by z) and then un-
+        normalize the result for the calling function."""
+
+        lamb = self.calc_lamb(x_surface, geom)
+        lamb_ref = lamb[self.idx_ref]
+        ci = self.component(x_surface, geom)
+        Cov = self.components[ci][1]
+        Cov = Cov * (self.norm(lamb_ref) ** 2)
+        
+        # append water thickness covariance
+        Cov = block_diag(Cov, self.ewt_sigma ** 2)
+
+        # If there are no other state vector elements, we're done.
+        if len(self.statevec_names) == len(self.idx_lamb):
+            return Cov
+
+        # Embed into a larger state vector covariance matrix
+        nprefix = self.idx_lamb[0]
+        nsuffix = len(self.statevec_names) - self.idx_lamb[-1] - 2   # changed to 2
+        Cov_prefix = np.zeros((nprefix, nprefix))
+        Cov_suffix = np.zeros((nsuffix, nsuffix))
+        return block_diag(Cov_prefix, Cov, Cov_suffix)
     
     # brand new!
     def calc_abs_vector(self, x_surface):
@@ -194,6 +119,18 @@ class MultiComponentSurface_Water(MultiComponentSurface):
 
         return attenuation
     
+
+    def dlamb_dsurface(self, x_surface, geom):
+        """Partial derivative of Lambertian reflectance with respect to
+        state vector, calculated at x_surface."""
+
+        dlamb = np.eye(self.n_wl, dtype=float)
+        nprefix = self.idx_lamb[0]
+        nsuffix = self.n_state - self.idx_lamb[-1] - 1
+        prefix = np.zeros((self.n_wl, nprefix))
+        suffix = np.zeros((self.n_wl, nsuffix))
+        return np.concatenate((prefix, dlamb, suffix), axis=1)
+
     # modified from surface_multicomp
     def dlamb_dsurface(self, x_surface, geom):
         """Partial derivative of Lambertian reflectance with respect to
