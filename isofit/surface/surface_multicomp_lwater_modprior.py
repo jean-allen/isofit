@@ -119,17 +119,6 @@ class MultiComponentSurface_Water(MultiComponentSurface):
         return attenuation
     
 
-    def dlamb_dsurface(self, x_surface, geom):
-        """Partial derivative of Lambertian reflectance with respect to
-        state vector, calculated at x_surface."""
-
-        dlamb = np.eye(self.n_wl, dtype=float)
-        nprefix = self.idx_lamb[0]
-        nsuffix = self.n_state - self.idx_lamb[-1] - 1
-        prefix = np.zeros((self.n_wl, nprefix))
-        suffix = np.zeros((self.n_wl, nsuffix))
-        return np.concatenate((prefix, dlamb, suffix), axis=1)
-
     # modified from surface_multicomp
     def dlamb_dsurface(self, x_surface, geom):
         """Partial derivative of Lambertian reflectance with respect to

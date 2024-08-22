@@ -144,6 +144,7 @@ def invert_algebraic(
     x_instrument: np.array,
     meas: np.array,
     geom: Geometry,
+    use_EWT=False
 ):
     """Inverts radiance algebraically using Lambertian assumptions to get a
     reflectance.
@@ -207,6 +208,10 @@ def invert_algebraic(
     # Prevent NaNs
     transm[transm == 0] = 1e-5
 
+    if use_EWT:
+        ewt = x_surface[-1]
+        x_surface = x_surface[:-1]
+
     # Calculate the initial emission and subtract from the measurement.
     # Surface and measured wavelengths may differ.
     Ls = surface.calc_Ls(x_surface, geom)
@@ -223,6 +228,11 @@ def invert_algebraic(
     rfl = 1.0 / (transm / (rho - rhoatm) + sphalb)
     rfl[rfl > 1.0] = 1.0
     rfl_est = interp1d(wl, rfl, fill_value="extrapolate")(surface.wl)
+
+    if use_EWT:
+        rfl_est_state = np.concatenate([rfl_est, [-ewt]])   # negative to get us to the "sans water" reflectance vector
+        rfl_est = surface.calc_lamb(rfl_est_state, geom)
+
 
     # Some downstream code will benefit from our precalculated
     # atmospheric optical parameters
