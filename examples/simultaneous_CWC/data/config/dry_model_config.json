@@ -1,0 +1,119 @@
+{
+    "ISOFIT_base": "/Users/jeaallen/Documents/simultaneous_EWT/isofit",
+    "forward_model": {
+        "instrument": {
+            "SNR": 500,
+            "integrations": 10,
+            "unknowns": {
+                "uncorrelated_radiometric_uncertainty": 0.01
+            },
+            "wavelength_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/wl_data.txt"
+        },
+        "radiative_transfer": {
+            "lut_grid": {
+                "AOT550": [
+                    0.001,
+                    0.1009,
+                    0.2008,
+                    0.3007,
+                    0.4006,
+                    0.5005
+                ],
+                "H2OSTR": [
+                    0.001,
+                    0.25,
+                    0.5,
+                    0.75,
+                    1.0,
+                    1.25,
+                    1.5,
+                    1.75,
+                    2.0,
+                    2.25,
+                    2.5,
+                    2.75,
+                    3.0,
+                    3.5,
+                    4.0,
+                    4.5,
+                    5.0
+                ]
+            },
+            "radiative_transfer_engines": {
+                "vswir": {
+                    "aerosol_model_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/data/aerosol_model.txt",
+                    "aerosol_template_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/data/aerosol_template.json",
+                    "earth_sun_distance_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/data/earth_sun_distance.txt",
+                    "emulator_aux_file": "/Users/jeaallen/Documents/simultaneous_EWT/sRTMnet_v100/sRTMnet_v120_aux.npz",
+                    "emulator_file": "/Users/jeaallen/Documents/simultaneous_EWT/sRTMnet_v100/sRTMnet_v120.h5",
+                    "engine_base_dir": "/Users/jeaallen/Documents/simultaneous_EWT/6sV2.1",
+                    "engine_name": "sRTMnet",
+                    "interpolator_base_path": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/lut_full/sRTMnet_v120_vi",
+                    "irradiance_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/20151026_SantaMonica/data/prism_optimized_irr.dat",
+                    "lut_names": {
+                        "AOT550": null,
+                        "H2OSTR": null
+                    },
+                    "lut_path": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/lut_full/lut.nc",
+                    "sim_path": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/lut_full",
+                    "statevector_names": [
+                        "H2OSTR",
+                        "AOT550"
+                    ],
+                    "template_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/config/modtran_tpl.json"
+                }
+            },
+            "statevector": {
+                "AOT550": {
+                    "bounds": [
+                        0.001,
+                        1.0
+                    ],
+                    "init": 0.1009,
+                    "prior_mean": 0.1009,
+                    "prior_sigma": 10.0,
+                    "scale": 1
+                },
+                "H2OSTR": {
+                    "bounds": [
+                        0.001,
+                        2.5
+                    ],
+                    "init": 1.7,
+                    "prior_mean": 1.7,
+                    "prior_sigma": 100.0,
+                    "scale": 1
+                }
+            },
+            "unknowns": {
+                "H2O_ABSCO": 0.0
+            }
+        },
+        "surface": {
+            "select_on_init": true,
+            "surface_category": "multicomponent_surface_lwater",
+            "surface_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/surfaces/dry_surface.mat"
+        }
+    },
+    "implementation": {
+        "debug_mode": false,
+        "inversion": {
+            "windows": [
+                [
+                    380.0,
+                    1325.0
+                ],
+                [
+                    1435,
+                    1770.0
+                ],
+                [
+                    1965.0,
+                    2500.0
+                ]
+            ]
+        },
+        "n_cores": 4,
+        "ray_temp_dir": "/tmp/ray"
+    }
+}
