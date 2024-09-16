@@ -2,13 +2,15 @@
     "ISOFIT_base": "/Users/jeaallen/Documents/simultaneous_EWT/isofit",
     "forward_model": {
         "instrument": {
-            "SNR": 500,
             "integrations": 10,
+            "parametric_noise_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/data/emit_noise.txt",
             "unknowns": {
+                "channelized_radiometric_uncertainty_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/channelized_uncertainty.txt",
                 "uncorrelated_radiometric_uncertainty": 0.01
             },
             "wavelength_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/wl_data.txt"
         },
+        "model_discrepancy_file": "/Users/jeaallen/Documents/simultaneous_EWT/isofit/examples/simultaneous_CWC/data/surfaces/model_discrepancy.mat",
         "radiative_transfer": {
             "lut_grid": {
                 "AOT550": [
@@ -67,7 +69,7 @@
                 "AOT550": {
                     "bounds": [
                         0.001,
-                        1.0
+                        0.5005
                     ],
                     "init": 0.1009,
                     "prior_mean": 0.1009,
